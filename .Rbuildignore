@@ -1,0 +1,11 @@
+^renv$
+^renv\.lock$
+^NLPRMetaflow\.Rproj$
+^\.Rproj\.user$
+^data$
+^LICENSE\.md$
+^\.github$
+^Dockerfile$
+^metaflow\.R$
+.RDS$
+^\.dockerignore$
