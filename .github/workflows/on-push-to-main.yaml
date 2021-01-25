@@ -72,6 +72,8 @@ jobs:
 
     name: build-and-push-image
 
+    needs: R-CMD-check
+
     steps:
     - name: Checkout repository to package subdirectory
       uses: actions/checkout@v2
