@@ -44,15 +44,16 @@ generate_flow <- function() {
              tree_depth = tune::tune(),
              sample_size = tune::tune()
            ) %>%
-             parsnip::set_engine("xgboost", nthread = 1) %>%
+             parsnip::set_engine("xgboost", nthread = 4) %>%
              parsnip::set_mode("regression")
            # We only need a 0-row tibble to initialise the recipe, and I'm
            # memory constrained in this step.
            message("Defining recipe")
            recipe <- generate_text_processing_recipe(
-             stars ~ definition,
+             interactions ~ definition,
              self$train[0,],
-             min_times = floor(0.01 * nrow(self$train))
+             text_column = definition,
+             min_times = 0.001
            )
            message("Combining model and recipe into workflow")
            self$workflow <- workflows::workflow() %>%
@@ -75,7 +76,7 @@ generate_flow <- function() {
     step(step = "tune_hyperparameters",
          decorator(
            "batch",
-           memory = 30000,
+           memory = 16000,
            cpu = 4,
            image = ecr_repository
          ),
@@ -103,7 +104,7 @@ generate_flow <- function() {
     step(step = "train_final_model", join = TRUE,
          decorator(
            "batch",
-           memory = 30000,
+           memory = 16000,
            cpu = 4,
            image = ecr_repository
          ),

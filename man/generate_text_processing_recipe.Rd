@@ -4,15 +4,26 @@
 \alias{generate_text_processing_recipe}
 \title{Generate a recipe for processing text data into a document-term matrix}
 \usage{
-generate_text_processing_recipe(formula, train_data, min_times = 10)
+generate_text_processing_recipe(
+  formula,
+  train_data,
+  text_column,
+  min_times = 0.01,
+  max_times = 1
+)
 }
 \arguments{
 \item{formula}{A model formula.}
 
 \item{train_data}{A data frame or tibble of the \emph{template} data set.}
 
-\item{min_times}{An integer. Minimum number of times a word can appear before
-getting removed. Defaults to 10.}
+\item{text_column}{Column containing the documents.}
+
+\item{min_times}{Numeric between 0 and 1. Minimum frequency at which a word
+can appear before getting removed. Defaults to 0.01.}
+
+\item{max_times}{Numeric between 0 and 1. Maximum frequency at which a word
+can appear before getting removed. Defaults to 1.}
 }
 \value{
 \code{recipes::recipe} object

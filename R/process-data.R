@@ -5,8 +5,11 @@
 #'
 #' @param formula A model formula.
 #' @param train_data A data frame or tibble of the _template_ data set.
-#' @param min_times An integer. Minimum number of times a word can appear before
-#'   getting removed. Defaults to 10.
+#' @param text_column Column containing the documents.
+#' @param min_times Numeric between 0 and 1. Minimum frequency at which a word
+#'   can appear before getting removed. Defaults to 0.01.
+#' @param max_times Numeric between 0 and 1. Maximum frequency at which a word
+#'   can appear before getting removed. Defaults to 1.
 #'
 #' @return `recipes::recipe` object
 #'
@@ -14,11 +17,22 @@
 #' @import textrecipes
 #' @export
 #'
-generate_text_processing_recipe <- function(formula, train_data, min_times = 10) {
+generate_text_processing_recipe <- function(
+  formula,
+  train_data,
+  text_column,
+  min_times = 0.01,
+  max_times = 1.00
+  ) {
   recipes::recipe(formula, data = train_data) %>%
-    step_filter(text != "") %>%
-    step_tokenize(text) %>%
-    step_stopwords(text, keep = TRUE) %>%
-    step_tokenfilter(text, min_times = min_times) %>%
-    step_tfidf(text)
+    step_filter({{text_column}} != "") %>%
+    step_tokenize({{text_column}}) %>%
+    step_stopwords({{text_column}}) %>%
+    step_tokenfilter(
+      {{text_column}},
+      min_times = min_times,
+      max_times = max_times,
+      percentage = TRUE
+    ) %>%
+    step_tfidf({{text_column}})
 }
