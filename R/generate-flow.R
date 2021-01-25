@@ -1,5 +1,9 @@
 #' Generate model training flow
 #'
+#' This function requires that an AWS account ID is configured as an
+#' environment variable "AWS_ACCOUNT_ID". This is used to construct the
+#' location of the image used to run the flow on AWS Batch.
+#'
 #' @return Metaflow flow object
 #'
 #' @import metaflow
@@ -7,136 +11,48 @@
 #' @importFrom magrittr %>%
 #' @export
 generate_flow <- function() {
+
+  # AWS configuration
   aws_region <- "ap-southeast-2"
   ecr_repository_name <- "nlprmetaflow"
+  git_hash <- system("git rev-parse HEAD", intern = TRUE)
   ecr_repository <- glue(
     "{Sys.getenv('AWS_ACCOUNT_ID')}.dkr.ecr.{aws_region}.amazonaws.com/",
-    "{ecr_repository_name}:latest"
+    "{ecr_repository_name}:{git_hash}"
   )
 
-  metaflow("yelp_reviews") %>%
-    step(step = "start",
-         r_function = function(self) {
-           message("Loading review data")
-           # This will skip approximately 650 bad rows in the CSV, which would
-           # generate warnings if not suppressed
-           ud_data <- suppressWarnings(
-             readr::read_csv("data/urbandict-word-defs.csv") %>%
-               dplyr::mutate(interactions = up_votes + down_votes)
-           )
+  # The same resource request will be used for all steps that are dispatched to
+  # the cloud.
+  decorator_use_aws_batch <- decorator(
+    "batch",
+    memory = 16000,
+    cpu = 4,
+    image = ecr_repository
+  )
 
-           message(glue::glue("Splitting {nrow(ud_data)} rows into train/test"))
-           n_train_rows <- floor(0.8 * nrow(ud_data))
-           train_indices <- sample(seq_len(nrow(ud_data)), size = n_train_rows)
-           self$train <- ud_data[train_indices, ]
-           self$test <- ud_data[-train_indices, ]
-           message(glue::glue("train has {nrow(self$train)} rows"))
-           message(glue::glue("test has {nrow(self$test)} rows"))
-         },
-         next_step = "configure_model"
+  metaflow("NLPRMetaflow") %>%
+    step(
+      step = "start",
+      r_function = prepare_data,
+      next_step = "configure_model"
     ) %>%
-    step(step = "configure_model",
-         r_function = function(self) {
-           message("Preparing model object for fitting")
-           model <- parsnip::boost_tree(
-             mtry = tune::tune(),
-             trees = tune::tune(),
-             tree_depth = tune::tune(),
-             sample_size = tune::tune()
-           ) %>%
-             parsnip::set_engine("xgboost", nthread = 4) %>%
-             parsnip::set_mode("regression")
-           # We only need a 0-row tibble to initialise the recipe, and I'm
-           # memory constrained in this step.
-           message("Defining recipe")
-           recipe <- generate_text_processing_recipe(
-             interactions ~ definition,
-             self$train[0,],
-             text_column = definition,
-             min_times = 0.001
-           )
-           message("Combining model and recipe into workflow")
-           self$workflow <- workflows::workflow() %>%
-             workflows::add_recipe(recipe) %>%
-             workflows::add_model(model)
-
-           message("Preparing hyperparameter grid for tuning")
-           self$hyperparameters <- tidyr::expand_grid(
-             mtry = c(0.5, 1),
-             trees = c(300, 500),
-             tree_depth = c(6, 12),
-             sample_size = c(0.8, 1.0)
-           )
-           self$hyperparameter_indices <- 1:nrow(self$hyperparameters)
-           message(glue::glue("Prepared hyperparameter grid with ",
-                        "{length(self$hyperparameter_indices)} combinations"))
-         },
-         next_step = "tune_hyperparameters", foreach = "hyperparameter_indices"
+    step(
+      step = "configure_model",
+      r_function = configure_model,
+      next_step = "tune_hyperparameters",
+      foreach = "hyperparameter_indices"
     ) %>%
-    step(step = "tune_hyperparameters",
-         decorator(
-           "batch",
-           memory = 16000,
-           cpu = 4,
-           image = ecr_repository
-         ),
-         r_function = function(self) {
-           hyperparameters_to_use <- self$hyperparameters[self$input,]
-
-           # metaflow uses pickles to save objects, which struggle with nested
-           # tibbles. Instead, we recreate the folds with a specific seed
-           message("Creating folds")
-           folds <- withr::with_seed(
-             20201225,
-             rsample::vfold_cv(self$train, v = 5)
-           )
-
-           message("Evaluating hyperparameters")
-           self$hyperparameter_results <- self$workflow %>%
-             tune::tune_grid(
-               resamples = folds,
-               grid = hyperparameters_to_use
-             ) %>% tune::collect_metrics()
-           message("Hyperparameters evaluated and metrics collected")
-         },
-         next_step = "train_final_model"
+    step(
+      step = "tune_hyperparameters",
+      decorator_use_aws_batch,
+      r_function = tune_hyperparameters,
+      next_step = "train_final_model"
     ) %>%
-    step(step = "train_final_model", join = TRUE,
-         decorator(
-           "batch",
-           memory = 16000,
-           cpu = 4,
-           image = ecr_repository
-         ),
-         r_function = function(self, inputs) {
-           message("Collecting hyperparameter results")
-           self$collected_hyperparameter_results <- gather_inputs(
-             inputs,
-             "hyperparameter_results"
-           ) %>% dplyr::bind_rows()
-
-           message("Merging artefacts from the join")
-           merge_artifacts(
-             self,
-             inputs,
-             exclude = list("hyperparameter_results")
-           )
-
-           message("Selecting optimal hyperparameters")
-           self$optimal_hyperparameters <- select_best_hyperparameters(
-             self$collected_hyperparameter_results,
-             metric = "rmse"
-           )
-
-           message("Training final model")
-           self$final_model <- self$workflow %>%
-             tune::finalize_workflow(self$optimal_hyperparameters) %>%
-             parsnip::fit(self$train)
-
-           message("Evaluating final model")
-           self$metrics <- self$final_model %>% evaluate_model(self$test)
-           message("Final model evaluated")
-         },
-         next_step="end") %>%
+    step(
+      step = "train_final_model",
+      join = TRUE,
+      decorator_use_aws_batch,
+      r_function = train_final_model,
+      next_step="end") %>%
     step(step = "end")
 }
