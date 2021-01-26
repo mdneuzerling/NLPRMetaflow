@@ -8,5 +8,7 @@
 #' @importFrom magrittr %>%
 #' @export
 evaluate_model <- function(model, test) {
-  model %>% predict(test) %>% metric_set(rmse, mae, rsq)(test$stars, .pred)
+  model %>%
+    predict(test) %>%
+    metric_set(rmse, mae, rsq)(test$interactions, .pred)
 }
