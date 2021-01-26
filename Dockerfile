@@ -1,6 +1,9 @@
 FROM rocker/r-ver:4.0.3
 ENV RENV_VERSION 0.12.3
-ENV MINICONDA_VERSION py39_4.9.2
+ENV MINICONDA_VERSION py38_4.9.2
+ENV PANDAS_VERSION 1.0.1
+ENV NUMPY_VERSION 1.19.5
+ENV METAFLOW_PYTHON_VERSION 2.2.5
 
 RUN apt-get update && apt-get install -y curl \
   && curl -LO https://repo.anaconda.com/miniconda/Miniconda3-${MINICONDA_VERSION}-Linux-x86_64.sh \
@@ -10,9 +13,8 @@ RUN apt-get update && apt-get install -y curl \
 ENV PATH=/miniconda/bin:${PATH}
 ENV METAFLOW_PYTHON /miniconda/bin/python3
 
-# I should probably version these
-RUN  conda install numpy pandas \
-  && conda install -c conda-forge metaflow
+RUN  conda install numpy=$NUMPY_VERSION pandas=$PANDAS_VERSION \
+  && conda install -c conda-forge metaflow=$METAFLOW_PYTHON_VERSION
 
 # Use the precompiled binaries kindly provided by RStudio
 ENV CRAN_REPO https://packagemanager.rstudio.com/all/__linux__/focal/latest
