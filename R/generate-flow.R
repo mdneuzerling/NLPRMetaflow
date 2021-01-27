@@ -25,7 +25,7 @@ generate_flow <- function() {
   # the cloud.
   decorator_use_aws_batch <- decorator(
     "batch",
-    memory = 16000,
+    memory = 15000,
     cpu = 4,
     image = ecr_repository
   )
@@ -51,7 +51,7 @@ generate_flow <- function() {
     step(
       step = "train_final_model",
       join = TRUE,
-      decorator_use_aws_batch,
+      decorator("batch", memory = 30000, cpu = 4, image = ecr_repository),
       r_function = train_final_model,
       next_step="end") %>%
     step(step = "end")
