@@ -10,5 +10,7 @@ generate_flow()
 Metaflow flow object
 }
 \description{
-Generate model training flow
+This function requires that an AWS account ID is configured as an
+environment variable "AWS_ACCOUNT_ID". This is used to construct the
+location of the image used to run the flow on AWS Batch.
 }
