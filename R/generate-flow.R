@@ -35,14 +35,14 @@ generate_flow <- function() {
     ) %>%
     step(
       step = "tune_hyperparameters",
-      # batch(memory = 16384, cpu = 4, gpu = "0", image = nlprmetaflow_image),
+      batch(memory = 16384, cpu = 4, gpu = "0", image = nlprmetaflow_image),
       r_function = tune_hyperparameters,
       next_step = "train_final_model"
     ) %>%
     step(
       step = "train_final_model",
       join = TRUE,
-      # batch(memory = 30720, cpu = 4, gpu = "0", image = nlprmetaflow_image),
+      batch(memory = 30720, cpu = 4, gpu = "0", image = nlprmetaflow_image),
       r_function = train_final_model,
       next_step="end") %>%
     step(step = "end")

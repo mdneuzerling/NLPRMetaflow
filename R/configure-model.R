@@ -6,7 +6,7 @@
 configure_model <- function(self) {
   message("Preparing model object for fitting")
   model <- parsnip::boost_tree(
-    mtry = tune::tune(),
+    learn_rate = tune::tune(),
     trees = tune::tune(),
     tree_depth = tune::tune(),
     sample_size = tune::tune()
@@ -29,7 +29,7 @@ configure_model <- function(self) {
 
   message("Preparing hyperparameter grid for tuning")
   self$hyperparameters <- tidyr::expand_grid(
-    mtry = c(0.5, 1),
+    learn_rate = c(0.1, 0.3),
     trees = c(300, 500),
     tree_depth = c(6, 12),
     sample_size = c(0.8, 1.0)
