@@ -14,11 +14,11 @@ generate_flow <- function() {
 
   # AWS configuration
   aws_region <- "ap-southeast-2"
-  ecr_repository_name <- "nlprmetaflow"
+  ecr_repository <- "nlprmetaflow"
   git_hash <- system("git rev-parse HEAD", intern = TRUE)
-  ecr_repository <- glue(
+  nlprmetaflow_image <- glue(
     "{Sys.getenv('AWS_ACCOUNT_ID')}.dkr.ecr.{aws_region}.amazonaws.com/",
-    "{ecr_repository_name}:{git_hash}"
+    "{ecr_repository}:{git_hash}"
   )
 
   metaflow("NLPRMetaflow") %>%
@@ -35,14 +35,14 @@ generate_flow <- function() {
     ) %>%
     step(
       step = "tune_hyperparameters",
-      batch(memory = 16384, cpu = 4, image = ecr_repository),
+      # batch(memory = 16384, cpu = 4, gpu = "0", image = nlprmetaflow_image),
       r_function = tune_hyperparameters,
       next_step = "train_final_model"
     ) %>%
     step(
       step = "train_final_model",
       join = TRUE,
-      batch(memory = 30720, cpu = 4, image = ecr_repository),
+      # batch(memory = 30720, cpu = 4, gpu = "0", image = nlprmetaflow_image),
       r_function = train_final_model,
       next_step="end") %>%
     step(step = "end")
