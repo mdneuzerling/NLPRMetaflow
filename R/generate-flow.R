@@ -35,14 +35,14 @@ generate_flow <- function() {
     ) %>%
     step(
       step = "tune_hyperparameters",
-      decorator("batch", memory = 16384, cpu = 4, image = ecr_repository),
+      batch(memory = 16384, cpu = 4, image = ecr_repository),
       r_function = tune_hyperparameters,
       next_step = "train_final_model"
     ) %>%
     step(
       step = "train_final_model",
       join = TRUE,
-      decorator("batch", memory = 30720, cpu = 4, image = ecr_repository),
+      batch(memory = 30720, cpu = 4, image = ecr_repository),
       r_function = train_final_model,
       next_step="end") %>%
     step(step = "end")
